@@ -3,7 +3,7 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 
 import { setupMockBackend, waitForAppReady } from './fixtures'
-import { expect, test } from './test'
+import { allowErrorBanners, expect, test } from './test'
 
 // Opt-in: this test really opens Explorer. It does not replace shell.openPath
 // with a spy, and closes only the window showing its own temporary directory.
@@ -80,6 +80,35 @@ test('an explicit transcript folder link opens Explorer without a preview pane',
     await page.screenshot({ path: testInfo.outputPath('native-folder-link.png') })
   } finally {
     if (folder) closeExplorerFolder(folder)
+    await fixture.cleanup()
+  }
+})
+
+test('a native folder error uses the configured language without creating the missing directory', async () => {
+  test.skip(!nativeExplorer, 'Opt in on Windows with HERMES_E2E_NATIVE_FILE_MANAGER=1')
+  test.setTimeout(180_000)
+  allowErrorBanners()
+  let missing = ''
+  const fixture = await setupMockBackend({
+    extraDisplayConfig: '  language: ru',
+    mockServer: {
+      replyForPrompt: () => `[Открыть папку](#folder/${encodeURIComponent(missing)})`
+    }
+  })
+
+  try {
+    missing = path.join(fixture.sandbox.root, 'missing-directory')
+    await waitForAppReady(fixture, 120_000)
+    const { page } = fixture
+    const composer = page.locator('[data-slot="composer-rich-input"]').first()
+    await composer.fill('Покажи ссылку на отсутствующую папку для проверки ошибки.')
+    await composer.press('Enter')
+    const link = page.getByRole('button', { name: 'Открыть папку', exact: true })
+    await expect(link).toBeVisible({ timeout: 60_000 })
+    await link.click()
+    await expect(page.getByRole('alert')).toContainText('Не удалось открыть папку')
+    expect(fs.existsSync(missing)).toBe(false)
+  } finally {
     await fixture.cleanup()
   }
 })
