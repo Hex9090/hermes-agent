@@ -4,7 +4,7 @@ import path from 'node:path'
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { openExistingDirectory } from './folder-links'
+import { assertFolderPath, openExistingDirectory } from './folder-links'
 import { WindowConnectionRouteRegistry } from './window-connection-route'
 
 const roots: string[] = []
@@ -28,6 +28,48 @@ async function fixture() {
 
   return { root, owner, routes, deps }
 }
+
+describe('folder path syntax independent of the host OS', () => {
+  it('validates Windows syntax, reserved names and ambiguous endings on every host', () => {
+    for (const target of ['C:/Reports', String.raw`C:\Reports\Проект #1 50% (final)`, 'C:/CONsole/COM10/NULs']) {
+      expect(() => assertFolderPath(target, 'win32'), target).not.toThrow()
+    }
+
+    for (const target of [
+      'C:/Reports:stream',
+      'C:/dir/NUL',
+      'C:/dir/nul.txt',
+      'C:/CON',
+      'C:/PRN',
+      'C:/AUX',
+      'C:/COM1',
+      'C:/COM9.log',
+      'C:/LPT1',
+      'C:/LPT9',
+      'C:/COM¹',
+      'C:/LPT²',
+      'C:/dir./child',
+      'C:/dir /child',
+      'C:/bad?name',
+      'C:/bad*name',
+      'C:/bad|name'
+    ]) {
+      expect(() => assertFolderPath(target, 'win32'), target).toThrow('Unsupported Windows folder path.')
+    }
+
+    expect(() => assertFolderPath('/tmp/reports', 'win32')).toThrow('Folder path does not match this computer.')
+  })
+
+  it.each(['linux', 'darwin'] as const)('uses POSIX syntax on %s without applying Windows reserved names', platform => {
+    for (const target of ['/tmp/Reports', '/tmp/NUL', '/tmp/Reports:stream', '/tmp/Проект #1 50% (final)']) {
+      expect(() => assertFolderPath(target, platform), target).not.toThrow()
+    }
+
+    for (const target of ['C:/Reports', '/tmp\\Reports']) {
+      expect(() => assertFolderPath(target, platform), target).toThrow('Folder path does not match this computer.')
+    }
+  })
+})
 
 describe('openExistingDirectory', () => {
   it('never creates missing paths or opens files, bundles, or symlinks to them', async () => {

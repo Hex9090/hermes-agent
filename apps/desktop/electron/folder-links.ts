@@ -11,7 +11,10 @@ interface FolderLinkDeps {
 }
 
 // Reject, rather than expand/normalize, syntax with another OS or shell meaning.
-function assertFolderPath(value: unknown): asserts value is string {
+export function assertFolderPath(
+  value: unknown,
+  platform: NodeJS.Platform = process.platform
+): asserts value is string {
   if (
     typeof value !== 'string' ||
     !value ||
@@ -23,7 +26,7 @@ function assertFolderPath(value: unknown): asserts value is string {
     throw new Error('An absolute local folder path is required.')
   }
 
-  const windows = process.platform === 'win32'
+  const windows = platform === 'win32'
 
   if (windows ? !/^[a-z]:[\\/]/i.test(value) : !value.startsWith('/') || value.includes('\\')) {
     throw new Error('Folder path does not match this computer.')
