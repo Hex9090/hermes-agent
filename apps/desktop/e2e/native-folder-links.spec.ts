@@ -39,10 +39,11 @@ function closeExplorerFolder(folder: string): void {
   )
 }
 
-test('an explicit transcript folder link opens Explorer without a preview pane', async ({}, testInfo) => {
+test('an explicit transcript folder link opens Explorer without a preview pane', async () => {
   test.skip(!nativeExplorer, 'Opt in on Windows with HERMES_E2E_NATIVE_FILE_MANAGER=1; opens real Explorer')
   test.setTimeout(180_000)
   let folder = ''
+
   const fixture = await setupMockBackend({
     mockServer: {
       replyForPrompt: () => {
@@ -50,6 +51,7 @@ test('an explicit transcript folder link opens Explorer without a preview pane',
           /[!'()*]/g,
           char => `%${char.charCodeAt(0).toString(16).toUpperCase()}`
         )
+
         return `[Open test folder](#folder/${encoded})`
       }
     }
@@ -77,9 +79,12 @@ test('an explicit transcript folder link opens Explorer without a preview pane',
     expect(fixture.app.windows()).toHaveLength(windowCountBefore)
     expect(await page.locator('[role="tab"]').count()).toBe(previewTabsBefore)
     await expect(page.getByRole('button', { name: 'Open preview', exact: true })).toHaveCount(0)
-    await page.screenshot({ path: testInfo.outputPath('native-folder-link.png') })
+    await page.screenshot({ path: test.info().outputPath('native-folder-link.png') })
   } finally {
-    if (folder) closeExplorerFolder(folder)
+    if (folder) {
+      closeExplorerFolder(folder)
+    }
+
     await fixture.cleanup()
   }
 })
@@ -89,6 +94,7 @@ test('a native folder error uses the configured language without creating the mi
   test.setTimeout(180_000)
   allowErrorBanners()
   let missing = ''
+
   const fixture = await setupMockBackend({
     extraDisplayConfig: '  language: ru',
     mockServer: {
